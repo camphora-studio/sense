@@ -1,0 +1,47 @@
+# These substitutions allow the end user to override certain values
+substitutions:
+  name: "air-purifier"
+  friendly_name: "Air Purifier"
+
+esphome:
+  name: "${name}"
+  friendly_name: "${friendly_name}"
+  name_add_mac_suffix: true
+
+
+  project:
+    name: camphora-studio.purifier-fan-controller
+    version: "0.1"
+
+# To be able to get logs from the device via serial and api.
+logger:
+
+# API is a requirement of the dashboard import.
+api:
+
+# OTA is required for Over-the-Air updating
+ota:
+  platform: esphome
+
+# This should point to the public location of this yaml file.
+dashboard_import:
+  package_import_url: github://CamphoraStudio/Air-Purifier/ESPHome/Air-Purifier.yaml@main
+  import_full_config: false
+
+wifi:
+  # Set up a wifi access point
+  ap:
+    password: "12345678"
+
+# In combination with the `ap` this allows the user
+# to provision wifi credentials to the device.
+captive_portal:
+
+# Sets up Bluetooth LE (Only on ESP32) to allow the user
+# to provision wifi credentials to the device.
+# esp32_improv:
+#  authorizer: none
+
+# Sets up the improv via serial client for Wi-Fi provisioning
+# improv_serial:
+#   next_url: https://example.com/project-template/manual?ip={{ip_address}}&name={{device_name}}&version={{esphome_version}}

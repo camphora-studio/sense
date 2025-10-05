@@ -25,7 +25,7 @@ ota:
 
 # This should point to the public location of this yaml file.
 dashboard_import:
-  package_import_url: github://CamphoraStudio/Air-Purifier/ESPHome/air-purifier.yaml@main
+  package_import_url: github://camphora-studio/air-purifier/esphome/air-purifier.yaml@main
   import_full_config: false
 
 wifi:

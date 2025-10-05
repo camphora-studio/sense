@@ -1,0 +1,8 @@
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+switch:
+  - platform: restart
+    name: "Air Purifier Restart"

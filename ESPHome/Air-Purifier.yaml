@@ -10,13 +10,8 @@ esphome:
 
 
   project:
-    name: camphora-studio.purifier-fan-controller
+    name: camphora-studio.air-purifier
     version: "0.1"
-
-esp32:
-  board: esp32-c3-devkitm-1
-  framework:
-    type: esp-idf
 
 # To be able to get logs from the device via serial and api.
 logger:
@@ -30,7 +25,7 @@ ota:
 
 # This should point to the public location of this yaml file.
 dashboard_import:
-  package_import_url: github://CamphoraStudio/Air-Purifier/ESPHome/Air-Purifier.yaml@main
+  package_import_url: github://CamphoraStudio/Air-Purifier/ESPHome/air-purifier.yaml@main
   import_full_config: false
 
 wifi:
@@ -41,11 +36,5 @@ wifi:
 # to provision wifi credentials to the device.
 captive_portal:
 
-# Sets up Bluetooth LE (Only on ESP32) to allow the user
-# to provision wifi credentials to the device.
-# esp32_improv:
-#  authorizer: none
-
-# Sets up the improv via serial client for Wi-Fi provisioning
-# improv_serial:
-#   next_url: https://example.com/project-template/manual?ip={{ip_address}}&name={{device_name}}&version={{esphome_version}}
+packages:
+  device: !include device.yaml

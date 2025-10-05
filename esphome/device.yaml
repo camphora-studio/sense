@@ -3,10 +3,6 @@ esp32:
   framework:
     type: esp-idf
 
-switch:
-  - platform: restart
-    name: "Air Purifier Restart"
-
 globals:
   - id: manual_fan_speed_state
     type: float

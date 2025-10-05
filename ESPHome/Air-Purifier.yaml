@@ -13,6 +13,11 @@ esphome:
     name: camphora-studio.purifier-fan-controller
     version: "0.1"
 
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
 # To be able to get logs from the device via serial and api.
 logger:
 
@@ -31,7 +36,6 @@ dashboard_import:
 wifi:
   # Set up a wifi access point
   ap:
-    password: "12345678"
 
 # In combination with the `ap` this allows the user
 # to provision wifi credentials to the device.

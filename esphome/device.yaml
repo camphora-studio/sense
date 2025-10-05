@@ -79,3 +79,9 @@ output:
     pin: GPIO5
     id: pwm_fan_4
     frequency: 25000 Hz
+
+button:
+  - platform: template
+    name: "Random Test Button"
+    on_press:
+      - logger.log: "Test button was pressed"

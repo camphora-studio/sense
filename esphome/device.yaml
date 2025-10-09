@@ -3,8 +3,19 @@ esp32:
   framework:
     type: esp-idf
 
-button:
-  - platform: template
-    name: "Random Test Button"
-    on_press:
-      - logger.log: "Test button was pressed"
+espnow:
+  id: espnow_component
+  on_boot:
+    priority: -100
+    then:
+      - wait_until:
+          wifi.connected:
+      - while:
+          condition:
+            wifi.connected:
+          then:
+            - espnow.send:
+                id: espnow_send_bcast
+                data: '{"msg_type":"DATA", "voc_index":150, "nox_index":75}'
+            - logger.log: "Sent dummy DATA packet"
+            - delay: 10s

@@ -21,3 +21,18 @@ esphome:
 espnow:
   # The component is enabled here, but the logic that uses it
   # is in the on_boot trigger above.
+
+sensor:
+  # This sensor gets the Wi-Fi channel. It will be a number (e.g., 1, 6, 11).
+  - platform: template
+    name: "WiFi Channel"
+    id: wifi_channel
+    lambda: |-
+      if (wifi::global_wifi_component->is_connected()) {
+        return wifi::global_wifi_component->get_wifi_channel();
+      } else {
+        return NAN; // Return Not-a-Number if not connected
+      }
+    update_interval: 60s
+    accuracy_decimals: 0
+    icon: "mdi:radio-tower"

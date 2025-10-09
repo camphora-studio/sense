@@ -3,8 +3,7 @@ esp32:
   framework:
     type: esp-idf
 
-espnow:
-  id: espnow_component
+esphome:
   on_boot:
     priority: -100
     then:
@@ -14,8 +13,11 @@ espnow:
           condition:
             wifi.connected:
           then:
-            - espnow.send:
-                id: espnow_send_bcast
+            - espnow.broadcast:
                 data: '{"msg_type":"DATA", "voc_index":150, "nox_index":75}'
             - logger.log: "Sent dummy DATA packet"
             - delay: 10s
+
+espnow:
+  # The component is enabled here, but the logic that uses it
+  # is in the on_boot trigger above.

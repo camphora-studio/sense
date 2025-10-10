@@ -1,0 +1,38 @@
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+esphome:
+  on_boot:
+    priority: -100
+    then:
+      - wait_until:
+          wifi.connected:
+      - while:
+          condition:
+            wifi.connected:
+          then:
+            - espnow.broadcast:
+                data: '{"msg_type":"DATA", "voc_index":150, "nox_index":75}'
+            - logger.log: "Sent dummy DATA packet"
+            - delay: 10s
+
+espnow:
+  # The component is enabled here, but the logic that uses it
+  # is in the on_boot trigger above.
+
+sensor:
+  # This sensor gets the Wi-Fi channel. It will be a number (e.g., 1, 6, 11).
+  - platform: template
+    name: "WiFi Channel"
+    id: wifi_channel
+    lambda: |-
+      if (wifi::global_wifi_component->is_connected()) {
+        return wifi::global_wifi_component->get_wifi_channel();
+      } else {
+        return NAN; // Return Not-a-Number if not connected
+      }
+    update_interval: 60s
+    accuracy_decimals: 0
+    icon: "mdi:radio-tower"

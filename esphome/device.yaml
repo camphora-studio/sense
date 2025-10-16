@@ -3,8 +3,56 @@ esp32:
   framework:
     type: esp-idf
 
-espnow:
+json:
 
+globals:
+  - id: aqm_is_pairing
+    type: bool
+    initial_value: 'false'
+
+script:
+  - id: broadcast_pairing_request
+    mode: restart # Ensures only one pairing process runs at a time.
+    then:
+      - lambda: 'id(aqm_is_pairing) = true;'
+      # Loop 20 times with a 3s delay, for a total timeout of 1 minute.
+      - repeat:
+          count: 20
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(aqm_is_pairing);'
+                then:
+                  - logger.log: "Broadcasting PAIR_REQ..."
+                  - espnow.broadcast:
+                      data: !lambda |-
+                        char buffer[128];
+                        snprintf(buffer, sizeof(buffer), "{\"msg_type\":\"PAIR_REQ\", \"sender_mac\":\"%s\"}", esphome::get_mac_address_pretty().c_str());
+                        std::string str_buffer = buffer;
+                        return std::vector<unsigned char>(str_buffer.begin(), str_buffer.end());
+                  - delay: 3s
+      # After the loop, check if we timed out.
+      - if:
+          condition:
+            lambda: 'return id(aqm_is_pairing);'
+          then:
+            - logger.log: "Pairing timed out. No PAIR_ACK received."
+            - lambda: 'id(aqm_is_pairing) = false;'
+
+espnow:
+  auto_add_peer: false
+  on_unknown_peer:
+    - lambda: |-
+        auto body = std::string(reinterpret_cast<const char*>(data), size);
+        json::parse_json(body, [&](JsonObject root) -> bool {
+          // Use a safer, type-aware check for the message type.
+          if (id(aqm_is_pairing) && root["msg_type"].is<const char*>() && root["msg_type"] == "PAIR_ACK") {
+            ESP_LOGI("pairing", "SUCCESS! PAIR_ACK received from %s.", format_mac_address_pretty(info.src_addr).c_str());
+            id(aqm_is_pairing) = false;
+            return true;
+          }
+          return false;
+        });
 
 binary_sensor:
   # Upper Button (GPIO9) - Sends Level 1 (Low Concern)
@@ -52,13 +100,7 @@ binary_sensor:
       min_length: 2s
       max_length: 10s
       then:
-        - logger.log: "PAIR/RESET button held. Broadcasting PAIR_REQ."
-        - espnow.broadcast:
-            data: !lambda |-
-              char buffer[128];
-              snprintf(buffer, sizeof(buffer), "{\"msg_type\":\"PAIR_REQ\", \"sender_mac\":\"%s\"}",
-                       esphome::get_mac_address_pretty().c_str());
-              // Create a std::string from our buffer
-              std::string str_buffer = buffer;
-              // Return the required vector of bytes from the string's contents
-              return std::vector<unsigned char>(str_buffer.begin(), str_buffer.end());
+        - logger.log: "PAIR/RESET button held. Starting pairing broadcast..."
+        # The button's only job is to start the main script.
+        - script.execute: broadcast_pairing_request
+

@@ -5,6 +5,7 @@ esp32:
 
 espnow:
 
+
 binary_sensor:
   # Upper Button (GPIO9) - Sends Level 1 (Low Concern)
   - platform: gpio
@@ -36,9 +37,9 @@ binary_sensor:
       then:
         - logger.log: "Button B (L3) pressed. Sending VOC=400, NOx=300"
         - espnow.broadcast:
-            data: '{"msg_type":"DATA", "voc_index":400, "nox_index":300}'
+            data: '{"msg_type":"DATA", "voc_index":100, "nox_index":10}'
 
-  # Lower Button (GPIO1) - Sends Level 0 (Good)
+  # Lower Button (GPIO1) - Handles Pairing Request
   - platform: gpio
     pin:
       number: GPIO1
@@ -47,8 +48,17 @@ binary_sensor:
     name: "PAIR/RESET Button"
     filters:
       - delayed_on: 20ms
-    on_press:
+    on_click:
+      min_length: 2s
+      max_length: 10s
       then:
-        - logger.log: "Button C (L0) pressed. Sending VOC=100, NOx=10"
+        - logger.log: "PAIR/RESET button held. Broadcasting PAIR_REQ."
         - espnow.broadcast:
-            data: '{"msg_type":"DATA", "voc_index":100, "nox_index":10}'
+            data: !lambda |-
+              char buffer[128];
+              snprintf(buffer, sizeof(buffer), "{\"msg_type\":\"PAIR_REQ\", \"sender_mac\":\"%s\"}",
+                       esphome::get_mac_address_pretty().c_str());
+              // Create a std::string from our buffer
+              std::string str_buffer = buffer;
+              // Return the required vector of bytes from the string's contents
+              return std::vector<unsigned char>(str_buffer.begin(), str_buffer.end());

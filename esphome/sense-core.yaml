@@ -30,18 +30,22 @@ font:
     id: my_font
     size: 20
 
+# ...
 display:
   - platform: waveshare_epaper
     id: e_ink_display
-    update_interval: 15s  # Try to update every 15 seconds on its own
+    update_interval: 15s
     cs_pin: GPIO10
     dc_pin: GPIO4
-    # busy_pin: GPIO3
+    # busy_pin: GPIO3  <- Keep this commented out for now
     reset_pin: GPIO5
-    model: gdey042t81
+    model: 4.20in-bv2-bwr  # <-- CHANGE THIS!
     lambda: |-
-      it.print(10, 10, id(my_font), "Testing...");
-      it.printf(10, 40, id(my_font), "Time: %lld", millis());
+      // Draw something black
+      it.print(10, 10, id(my_font), "This is Black");
+
+      // Draw something red
+      it.print(10, 40, id(my_font), Color(255, 0, 0), "This is Red");
 
 binary_sensor:
   # Upper Button (GPIO9) - Simulates Level 1 (Low Concern)

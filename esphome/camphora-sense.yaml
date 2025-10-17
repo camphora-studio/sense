@@ -36,4 +36,4 @@ wifi:
 captive_portal:
 
 packages:
-  device: !include sense-core.yaml
+  core: !include sense-core.yaml

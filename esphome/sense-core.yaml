@@ -20,6 +20,52 @@ globals:
     type: int
     initial_value: '10'  # Default good air quality
 
+
+# sense-core.yaml
+# sense-core.yaml (Corrected Action)
+
+spi:
+  clk_pin: GPIO6
+  mosi_pin: GPIO7
+
+font:
+  - file: "gfonts://Roboto"
+    id: my_font
+    size: 20
+
+display:
+  - platform: waveshare_epaper
+    id: e_ink_display
+    update_interval: never
+    cs_pin: GPIO10
+    dc_pin: GPIO4
+    busy_pin: GPIO3
+    reset_pin: GPIO5
+    model: gdey042t81
+    lambda: |-
+      it.print(10, 10, id(my_font), "Hello World!");
+
+button:
+  - platform: template
+    name: "Update E-Ink Display"
+    on_press:
+      - component.update: e_ink_display # This is the correct action
+
+script: 
+  - id: factory_reset_timer
+    mode: restart
+    then:
+      - delay: 10s # a 10 second hold triggers a reset
+      - logger.log: "HOLD DETECTED: Factory reset initiated."
+      - script.execute: factory_reset
+
+  - id: factory_reset
+    mode: single
+    then:
+      - logger.log: "CORE: Factory reset complete. (No actions defined yet)."
+      # Future actions like clearing saved sensor states will go here.
+
+
 binary_sensor:
   # Upper Button (GPIO9) - Simulates Level 1 (Low Concern)
   - platform: gpio
@@ -72,16 +118,3 @@ binary_sensor:
         # This script is defined in the sense-espnow package.
         - script.execute: broadcast_pairing_request
 
-script:
-  - id: factory_reset_timer
-    mode: restart
-    then:
-      - delay: 10s # a 10 second hold triggers a reset
-      - logger.log: "HOLD DETECTED: Factory reset initiated."
-      - script.execute: factory_reset
-
-  - id: factory_reset
-    mode: single
-    then:
-      - logger.log: "CORE: Factory reset complete. (No actions defined yet)."
-      # Future actions like clearing saved sensor states will go here.

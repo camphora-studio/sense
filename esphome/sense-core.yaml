@@ -36,7 +36,7 @@ display:
     update_interval: 15s  # Try to update every 15 seconds on its own
     cs_pin: GPIO10
     dc_pin: GPIO4
-    busy_pin: GPIO3
+    # busy_pin: GPIO3
     reset_pin: GPIO5
     model: gdey042t81
     lambda: |-

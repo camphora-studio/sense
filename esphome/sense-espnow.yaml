@@ -60,6 +60,8 @@ script:
             // This reads the global variables from the core file to build the message.
             char buffer[128];
             snprintf(buffer, sizeof(buffer),
-                     "{\"msg_type\":\"DATA\", \"voc_index\":%d, \"nox_index\":%d}",
-                     id(current_voc_index), id(current_nox_index));
-            return std::string(buffer);
+                    "{\"msg_type\":\"DATA\", \"voc_index\":%d, \"nox_index\":%d}",
+                    id(current_voc_index), id(current_nox_index));
+            // ESP-NOW expects data as a vector of unsigned characters.
+            std::string message = buffer;
+            return std::vector<unsigned char>(message.begin(), message.end());

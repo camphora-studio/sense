@@ -1,106 +1,87 @@
+# sense-core.yaml
+# Main firmware for the Camphora Sense Air Quality Monitor
+# Handles button logic and sensor state management.
+
 esp32:
   board: esp32-c3-devkitm-1
   framework:
-    type: esp-idf
+    type: esp-idf   # Don't use 'arduino' here, made the chip unflashable
 
-json:
+packages:
+  # Import all espnow communication-related logic from the separate file
+  comms: !include sense-espnow.yaml
 
 globals:
-  - id: aqm_is_pairing
-    type: bool
-    initial_value: 'false'
-
-script:
-  - id: broadcast_pairing_request
-    mode: restart # Ensures only one pairing process runs at a time.
-    then:
-      - lambda: 'id(aqm_is_pairing) = true;'
-      # Loop 20 times with a 3s delay, for a total timeout of 1 minute.
-      - repeat:
-          count: 20
-          then:
-            - if:
-                condition:
-                  lambda: 'return id(aqm_is_pairing);'
-                then:
-                  - logger.log: "Broadcasting PAIR_REQ..."
-                  - espnow.broadcast:
-                      data: !lambda |-
-                        char buffer[128];
-                        snprintf(buffer, sizeof(buffer), "{\"msg_type\":\"PAIR_REQ\", \"sender_mac\":\"%s\"}", esphome::get_mac_address_pretty().c_str());
-                        std::string str_buffer = buffer;
-                        return std::vector<unsigned char>(str_buffer.begin(), str_buffer.end());
-                  - delay: 3s
-      # After the loop, check if we timed out.
-      - if:
-          condition:
-            lambda: 'return id(aqm_is_pairing);'
-          then:
-            - logger.log: "Pairing timed out. No PAIR_ACK received."
-            - lambda: 'id(aqm_is_pairing) = false;'
-
-espnow:
-  auto_add_peer: false
-  on_unknown_peer:
-    - lambda: |-
-        auto body = std::string(reinterpret_cast<const char*>(data), size);
-        json::parse_json(body, [&](JsonObject root) -> bool {
-          // Use a safer, type-aware check for the message type.
-          if (id(aqm_is_pairing) && root["msg_type"].is<const char*>() && root["msg_type"] == "PAIR_ACK") {
-            ESP_LOGI("pairing", "SUCCESS! PAIR_ACK received from %s.", format_mac_address_pretty(info.src_addr).c_str());
-            id(aqm_is_pairing) = false;
-            return true;
-          }
-          return false;
-        });
+  # These variables hold the current air quality state.
+  - id: current_voc_index
+    type: int
+    initial_value: '100' # Default good air quality
+  - id: current_nox_index
+    type: int
+    initial_value: '10'  # Default good air quality
 
 binary_sensor:
-  # Upper Button (GPIO9) - Sends Level 1 (Low Concern)
+  # Upper Button (GPIO9) - Simulates Level 1 (Low Concern)
   - platform: gpio
     pin:
       number: GPIO9
       mode: INPUT_PULLUP
       inverted: true
-    name: "DISPLAY Button"
-    filters:
-      # This is the correct filter for debouncing.
-      # It waits 20ms before setting the state to ON.
-      - delayed_on: 20ms
+    name: "Set L1 AQI"
     on_press:
-      then:
-        - logger.log: "Button A (L1) pressed. Sending VOC=150, NOx=20"
-        - espnow.broadcast:
-            data: '{"msg_type":"DATA", "voc_index":150, "nox_index":20}'
+      - logger.log: "Button A pressed. Setting AQI to Level 1."
+      # Step 1: Update the global state variables.
+      - lambda: |-
+          id(current_voc_index) = 150;
+          id(current_nox_index) = 20;
+      # Step 2: Call the script to broadcast the new state.
+      - script.execute: broadcast_data
 
-  # Middle Button (GPIO0) - Sends Level 3 (High Concern)
+  # Middle Button (GPIO0) - Simulates Good Air Quality 
   - platform: gpio
     pin:
       number: GPIO0
       mode: INPUT_PULLUP
       inverted: true
-    name: "RESUME Button"
-    filters:
-      - delayed_on: 20ms
+    name: "Set baseline AQI"
     on_press:
-      then:
-        - logger.log: "Button B (L3) pressed. Sending VOC=400, NOx=300"
-        - espnow.broadcast:
-            data: '{"msg_type":"DATA", "voc_index":100, "nox_index":10}'
+      - logger.log: "Button B pressed. Setting AQI to baseline."
+      - lambda: |-
+          id(current_voc_index) = 100;
+          id(current_nox_index) = 10;
+      - script.execute: broadcast_data
 
-  # Lower Button (GPIO1) - Handles Pairing Request
+  # Lower Button (GPIO1) - Handles Pairing and Reset
   - platform: gpio
     pin:
       number: GPIO1
       mode: INPUT_PULLUP
       inverted: true
     name: "PAIR/RESET Button"
-    filters:
-      - delayed_on: 20ms
+    # When the button is FIRST pressed down, start factory reset countdwon
+    on_press:
+      - script.execute: factory_reset_timer
+    # When the button is RELEASED, stop factory reset countdown, if < time limit, factory reset won't happen
+    on_release:
+      - script.stop: factory_reset_timer
+    # If the press release is quick, it's a short press, so enter pairing mode
     on_click:
-      min_length: 2s
-      max_length: 10s
+      max_length: 2s
       then:
-        - logger.log: "PAIR/RESET button held. Starting pairing broadcast..."
-        # The button's only job is to start the main script.
+        - logger.log: "Short press detected. Starting pairing broadcast..."
+        # This script is defined in the sense-espnow package.
         - script.execute: broadcast_pairing_request
 
+script:
+  - id: factory_reset_timer
+    mode: restart
+    then:
+      - delay: 10s # a 10 second hold triggers a reset
+      - logger.log: "HOLD DETECTED: Factory reset initiated."
+      - script.execute: factory_reset
+
+  - id: factory_reset
+    mode: single
+    then:
+      - logger.log: "CORE: Factory reset complete. (No actions defined yet)."
+      # Future actions like clearing saved sensor states will go here.

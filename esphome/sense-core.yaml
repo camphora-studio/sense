@@ -1,15 +1,21 @@
 # sense-core.yaml
 # Main firmware for the Camphora Sense Air Quality Monitor
-# Handles button logic and sensor state management.
+# Handles button logic, sensor state management, and I2C/ESP-NOW.
 
 esp32:
   board: esp32-c3-devkitm-1
   framework:
-    type: esp-idf   # Don't use 'arduino' here, made the chip unflashable
+    type: esp-idf
 
 packages:
   # Import all espnow communication-related logic from the separate file
   comms: !include sense-espnow.yaml
+
+# Added I2C bus definition for the sensors
+i2c:
+  sda: GPIO18
+  scl: GPIO19
+  scan: true # Set to true for debugging. Will show all found I2C addresses on boot.
 
 globals:
   # These variables hold the current air quality state.
@@ -20,47 +26,57 @@ globals:
     type: int
     initial_value: '10'  # Default good air quality
 
+interval:
+  - interval: 10s
+    then:
+      - script.execute: broadcast_data
 
-spi:
-  clk_pin: GPIO6
-  mosi_pin: GPIO7
+sensor:
+  # Add the SEN5x sensor platform
+  - platform: sen5x
+    id: sen5x_sensor
+    # Per spec 2.2.3, store the algorithm state
+    store_baseline: true 
+    update_interval: 10s # Match the broadcast interval
+    
+    # --- Core Sensors for Broadcast Logic ---
+    voc:
+      name: "SEN5x VOC Index"
+      # When the sensor gets a new value, update the global variable
+      on_value:
+        - lambda: 'id(current_voc_index) = x;'
+    nox:
+      name: "SEN5x NOx Index"
+      # When the sensor gets a new value, update the global variable
+      on_value:
+        - lambda: 'id(current_nox_index) = x;'
 
-font:
-  - file: "gfonts://Roboto"
-    id: my_font
-    size: 20
-
-# ...
-display:
-  - platform: waveshare_epaper
-    id: e_ink_display
-    update_interval: 15s
-    cs_pin: GPIO10
-    dc_pin: GPIO4
-    reset_pin: GPIO5
-    model: 4.20in-bv2-bwr  # <-- CHANGE THIS!
-    lambda: |-
-      // Draw something black
-      it.print(10, 10, id(my_font), "This is Black");
-
-      // Draw something red
-      it.print(10, 40, id(my_font), Color(255, 0, 0), "This is Red");
+    # --- Optional Sensors for Logging/Debugging ---
+    pm_2_5:
+      name: "SEN5x PM 2.5"
+    temperature:
+      name: "SEN5x Temperature"
+    humidity:
+      name: "SEN5x Humidity"
 
 binary_sensor:
+  # These buttons now act as a manual override for testing.
+  # The sensor will overwrite these values on its next 10-second update.
+  
   # Upper Button (GPIO9) - Simulates Level 1 (Low Concern)
   - platform: gpio
     pin:
       number: GPIO9
       mode: INPUT_PULLUP
       inverted: true
-    name: "Set L1 AQI"
+    name: "Set L1 AQI (Manual)"
     on_press:
-      - logger.log: "Button A pressed. Setting AQI to Level 1."
+      - logger.log: "Button A pressed. Manually setting AQI to Level 1."
       # Step 1: Update the global state variables.
       - lambda: |-
           id(current_voc_index) = 150;
           id(current_nox_index) = 20;
-      # Step 2: Call the script to broadcast the new state.
+      # Step 2: Call the script to broadcast the new state immediately.
       - script.execute: broadcast_data
 
   # Middle Button (GPIO0) - Simulates Good Air Quality 
@@ -69,9 +85,9 @@ binary_sensor:
       number: GPIO0
       mode: INPUT_PULLUP
       inverted: true
-    name: "Set baseline AQI"
+    name: "Set baseline AQI (Manual)"
     on_press:
-      - logger.log: "Button B pressed. Setting AQI to baseline."
+      - logger.log: "Button B pressed. Manually setting AQI to baseline."
       - lambda: |-
           id(current_voc_index) = 100;
           id(current_nox_index) = 10;
@@ -84,13 +100,10 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     name: "PAIR/RESET Button"
-    # When the button is FIRST pressed down, start factory reset countdwon
     on_press:
       - script.execute: factory_reset_timer
-    # When the button is RELEASED, stop factory reset countdown, if < time limit, factory reset won't happen
     on_release:
       - script.stop: factory_reset_timer
-    # If the press release is quick, it's a short press, so enter pairing mode
     on_click:
       max_length: 2s
       then:
@@ -110,4 +123,4 @@ script:
     mode: single
     then:
       - logger.log: "CORE: Factory reset complete. (No actions defined yet)."
-      # Future actions like clearing saved sensor states will go here.
+      # Future: Add 'sen5x.reset_baseline' or clear flash.

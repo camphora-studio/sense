@@ -37,9 +37,6 @@ display:
     update_interval: 15s
     cs_pin: GPIO10
     dc_pin: GPIO4
-    busy_pin:
-      number: GPIO3
-      inverted: true # <-- Crucial test
     reset_pin: GPIO5
     model: 4.20in-bv2-bwr  # <-- CHANGE THIS!
     lambda: |-

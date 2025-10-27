@@ -41,23 +41,42 @@ sensor:
     
     # --- Core Sensors for Broadcast Logic ---
     voc:
-      name: "SEN5x VOC Index"
+      name: VOC
       # When the sensor gets a new value, update the global variable
       on_value:
         - lambda: 'id(current_voc_index) = x;'
     nox:
-      name: "SEN5x NOx Index"
+      name: NOx
       # When the sensor gets a new value, update the global variable
       on_value:
         - lambda: 'id(current_nox_index) = x;'
 
     # --- Optional Sensors for Logging/Debugging ---
+    pm_1_0:
+      name: PM <1µm Weight concentration
     pm_2_5:
-      name: "SEN5x PM 2.5"
+      name: PM <2.5µm Weight concentration
+    pm_4_0:
+      name: PM <4µm Weight concentration
+    pm_10_0:
+      name: PM <10µm Weight concentration
     temperature:
-      name: "SEN5x Temperature"
+      name: Temperature
     humidity:
-      name: "SEN5x Humidity"
+      name: Humidity
+
+  - platform: scd4x
+    id: scd4x_sensor # ID for the calibration service
+    co2:
+      name: "CO2"
+    temperature:
+      name: "SCD4x Temperature"
+    humidity:
+      name: "SCD4x Humidity"
+    # Per your spec 2.2.1, ASC is enabled (this is the default)
+    automatic_self_calibration: true 
+    # Match the SEN5x update interval for consistency
+    update_interval: 10s
 
 binary_sensor:
   # These buttons now act as a manual override for testing.

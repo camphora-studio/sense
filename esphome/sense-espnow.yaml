@@ -1,0 +1,67 @@
+# sense-espnow.yaml
+# This package handles all ESP-NOW communication for the Air Quality Monitor (AQM).
+
+json:
+
+globals:
+  - id: is_pairing
+    type: bool
+    initial_value: 'false'
+
+espnow:
+  auto_add_peer: false
+
+  # When a PAIR_ACK is received, it means a fan controller has recieved and saved our MAC
+  on_unknown_peer: # This device never saves peer so all messages will be unknown peers
+    - lambda: |-
+        auto body = std::string(reinterpret_cast<const char*>(data), size);
+        json::parse_json(body, [&](JsonObject root) -> bool {
+          if (id(is_pairing) && root["msg_type"] == "PAIR_ACK") {
+            ESP_LOGI("pairing", "SUCCESS! PAIR_ACK received from %s.", format_mac_address_pretty(info.src_addr).c_str());
+            id(is_pairing) = false; // Stop the broadcast loop
+            return true;
+          }
+          return false;
+        });
+  
+  # The rest of the espnow broadcast is triggered by scripts below
+
+script:
+  - id: broadcast_pairing_request
+    mode: restart # Ensures only one pairing process runs at a time.
+    then:
+      - lambda: 'id(is_pairing) = true;'
+      # Loop for 1 minute, broadcasting every 3 seconds.
+      - repeat:
+          count: 20
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(is_pairing);' # Stop if we get an ACK
+                then:
+                  - logger.log: "Broadcasting PAIR_REQ..."
+                  - espnow.broadcast:
+                      data: '{"msg_type":"PAIR_REQ"}'
+                  - delay: 3s
+      # After the loop, check if we timed out.
+      - if:
+          condition:
+            lambda: 'return id(is_pairing);'
+          then:
+            - logger.log: "Pairing timed out."
+            - lambda: 'id(is_pairing) = false;'
+
+  - id: broadcast_data
+    mode: single
+    then:
+      - logger.log: "Broadcasting sensor data..."
+      - espnow.broadcast:
+          data: !lambda |-
+            // This reads the global variables from the core file to build the message.
+            char buffer[128];
+            snprintf(buffer, sizeof(buffer),
+                    "{\"msg_type\":\"DATA\", \"voc_index\":%d, \"nox_index\":%d}",
+                    id(current_voc_index), id(current_nox_index));
+            // ESP-NOW expects data as a vector of unsigned characters.
+            std::string message = buffer;
+            return std::vector<unsigned char>(message.begin(), message.end());

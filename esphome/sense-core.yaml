@@ -1,0 +1,113 @@
+# sense-core.yaml
+# Main firmware for the Camphora Sense Air Quality Monitor
+# Handles button logic and sensor state management.
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf   # Don't use 'arduino' here, made the chip unflashable
+
+packages:
+  # Import all espnow communication-related logic from the separate file
+  comms: !include sense-espnow.yaml
+
+globals:
+  # These variables hold the current air quality state.
+  - id: current_voc_index
+    type: int
+    initial_value: '100' # Default good air quality
+  - id: current_nox_index
+    type: int
+    initial_value: '10'  # Default good air quality
+
+
+spi:
+  clk_pin: GPIO6
+  mosi_pin: GPIO7
+
+font:
+  - file: "gfonts://Roboto"
+    id: my_font
+    size: 20
+
+# ...
+display:
+  - platform: waveshare_epaper
+    id: e_ink_display
+    update_interval: 15s
+    cs_pin: GPIO10
+    dc_pin: GPIO4
+    reset_pin: GPIO5
+    model: 4.20in-bv2-bwr  # <-- CHANGE THIS!
+    lambda: |-
+      // Draw something black
+      it.print(10, 10, id(my_font), "This is Black");
+
+      // Draw something red
+      it.print(10, 40, id(my_font), Color(255, 0, 0), "This is Red");
+
+binary_sensor:
+  # Upper Button (GPIO9) - Simulates Level 1 (Low Concern)
+  - platform: gpio
+    pin:
+      number: GPIO9
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Set L1 AQI"
+    on_press:
+      - logger.log: "Button A pressed. Setting AQI to Level 1."
+      # Step 1: Update the global state variables.
+      - lambda: |-
+          id(current_voc_index) = 150;
+          id(current_nox_index) = 20;
+      # Step 2: Call the script to broadcast the new state.
+      - script.execute: broadcast_data
+
+  # Middle Button (GPIO0) - Simulates Good Air Quality 
+  - platform: gpio
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Set baseline AQI"
+    on_press:
+      - logger.log: "Button B pressed. Setting AQI to baseline."
+      - lambda: |-
+          id(current_voc_index) = 100;
+          id(current_nox_index) = 10;
+      - script.execute: broadcast_data
+
+  # Lower Button (GPIO1) - Handles Pairing and Reset
+  - platform: gpio
+    pin:
+      number: GPIO1
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "PAIR/RESET Button"
+    # When the button is FIRST pressed down, start factory reset countdwon
+    on_press:
+      - script.execute: factory_reset_timer
+    # When the button is RELEASED, stop factory reset countdown, if < time limit, factory reset won't happen
+    on_release:
+      - script.stop: factory_reset_timer
+    # If the press release is quick, it's a short press, so enter pairing mode
+    on_click:
+      max_length: 2s
+      then:
+        - logger.log: "Short press detected. Starting pairing broadcast..."
+        # This script is defined in the sense-espnow package.
+        - script.execute: broadcast_pairing_request
+
+script: 
+  - id: factory_reset_timer
+    mode: restart
+    then:
+      - delay: 10s # a 10 second hold triggers a reset
+      - logger.log: "HOLD DETECTED: Factory reset initiated."
+      - script.execute: factory_reset
+
+  - id: factory_reset
+    mode: single
+    then:
+      - logger.log: "CORE: Factory reset complete. (No actions defined yet)."
+      # Future actions like clearing saved sensor states will go here.
